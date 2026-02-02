@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Text Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #ffffff;
+            --text: #0a0a0a;
+            --island-bg: #f5f5f5;
+            --island-border: #e0e0e0;
+            --button-hover: #e8e8e8;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --island-scale: 0.9;
+        }
+
+        [data-theme="dark"] {
+            --bg: #1a1a1a;
+            --text: #f0f0f0;
+            --island-bg: #2a2a2a;
+            --island-border: #3a3a3a;
+            --button-hover: #3a3a3a;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --island-scale: 0.9;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            transition: background 0.3s, color 0.3s;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #editor {
+            width: 100%;
+            height: 100vh;
+            padding: 20px;
+            padding-top: 100px;
+            outline: none;
+            font-size: 16px;
+            line-height: 1.6;
+            overflow-y: auto;
+            background: transparent;
+            color: var(--text);
+            transition: color 0.3s;
+        }
+
+        @media (max-width: 768px) {
+            #editor {
+                padding-top: 80px;
+                padding-bottom: 20px;
+            }
+        }
+
+        #toolbar {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) scale(var(--island-scale));
+            background: var(--island-bg);
+            border: 1px solid var(--island-border);
+            border-radius: 20px;
+            padding: 12px 16px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            box-shadow: 0 8px 24px var(--shadow);
+            transition: all 0.3s ease;
+            max-width: 90vw;
+            overflow-x: auto;
+            z-index: 1000;
+        }
+
+
+        #toolbar::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        #toolbar::-webkit-scrollbar-thumb {
+            background: var(--island-border);
+            border-radius: 2px;
+        }
+
+        .tool-btn {
+            background: transparent;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            color: var(--text);
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .tool-btn:hover {
+            background: var(--button-hover);
+        }
+
+        .tool-btn:active {
+            transform: scale(0.95);
+        }
+
+        .tool-btn.active {
+            background: var(--button-hover);
+        }
+
+        .divider {
+            width: 1px;
+            height: 24px;
+            background: var(--island-border);
+            margin: 0 4px;
+            flex-shrink: 0;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            #toolbar {
+                top: 10px;
+                padding: 7px 9px;
+                gap: 3px;
+            }
+
+            .tool-btn {
+                width: 28px;
+                height: 28px;
+                font-size: 14px;
+            }
+
+            #editor {
+                padding: 15px;
+                padding-top: 70px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #toolbar {
+                gap: 4px;
+                padding: 8px 10px;
+            }
+
+            .tool-btn {
+                width: 30px;
+                height: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="editor" contenteditable="true" spellcheck="false"></div>
+    
+    <div id="toolbar">
+        <button class="tool-btn" onclick="toggleCmd('bold')" title="Bold">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
+                <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
+            </svg>
+        </button>
+        
+        <button class="tool-btn" onclick="toggleCmd('italic')" title="Italic">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="19" y1="4" x2="10" y2="4"/>
+                <line x1="14" y1="20" x2="5" y2="20"/>
+                <line x1="15" y1="4" x2="9" y2="20"/>
+            </svg>
+        </button>
+        
+        <button class="tool-btn" onclick="toggleCmd('underline')" title="Underline">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/>
+                <line x1="4" y1="21" x2="20" y2="21"/>
+            </svg>
+        </button>
+
+        <div class="divider"></div>
+
+        <button class="tool-btn highlight-btn" onclick="applyHighlight('#FFEB3B')" title="Yellow Highlight" style="position: relative;">
+            <svg width="20" height="20" viewBox="0 0 24 24">
+                <rect x="4" y="8" width="16" height="12" fill="#FFEB3B" opacity="0.35" rx="2"/>
+            </svg>
+        </button>
+
+        <button class="tool-btn highlight-btn" onclick="applyHighlight('#FF69B4')" title="Pink Highlight" style="position: relative;">
+            <svg width="20" height="20" viewBox="0 0 24 24">
+                <rect x="4" y="8" width="16" height="12" fill="#FF69B4" opacity="0.35" rx="2"/>
+            </svg>
+        </button>
+
+        <button class="tool-btn highlight-btn" onclick="applyHighlight('#2196F3')" title="Blue Highlight" style="position: relative;">
+            <svg width="20" height="20" viewBox="0 0 24 24">
+                <rect x="4" y="8" width="16" height="12" fill="#2196F3" opacity="0.35" rx="2"/>
+            </svg>
+        </button>
+
+        <button class="tool-btn" onclick="removeHighlight()" title="Remove Highlight">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
+
+        <div class="divider"></div>
+
+        <button class="tool-btn" onclick="execCmd('justifyLeft')" title="Align Left">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="17" y1="10" x2="3" y2="10"/>
+                <line x1="21" y1="6" x2="3" y2="6"/>
+                <line x1="21" y1="14" x2="3" y2="14"/>
+                <line x1="17" y1="18" x2="3" y2="18"/>
+            </svg>
+        </button>
+        
+        <button class="tool-btn" onclick="execCmd('justifyCenter')" title="Align Center">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="10" x2="6" y2="10"/>
+                <line x1="21" y1="6" x2="3" y2="6"/>
+                <line x1="21" y1="14" x2="3" y2="14"/>
+                <line x1="18" y1="18" x2="6" y2="18"/>
+            </svg>
+        </button>
+        
+        <button class="tool-btn" onclick="execCmd('justifyRight')" title="Align Right">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="21" y1="10" x2="7" y2="10"/>
+                <line x1="21" y1="6" x2="3" y2="6"/>
+                <line x1="21" y1="14" x2="3" y2="14"/>
+                <line x1="21" y1="18" x2="7" y2="18"/>
+            </svg>
+        </button>
+
+        <div class="divider"></div>
+
+        <button class="tool-btn" onclick="decreaseFontSize()" title="Decrease Font Size">
+            <span style="font-weight: 600; font-size: 14px;">A-</span>
+        </button>
+        
+        <button class="tool-btn" onclick="increaseFontSize()" title="Increase Font Size">
+            <span style="font-weight: 600; font-size: 18px;">A+</span>
+        </button>
+
+        <div class="divider"></div>
+
+        <button class="tool-btn" onclick="downloadText()" title="Export .txt">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+        </button>
+        
+        <button class="tool-btn" onclick="document.getElementById('fileInput').click()" title="Import .txt">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+        </button>
+
+        <div class="divider"></div>
+
+        <button class="tool-btn" onclick="toggleSpellCheck()" id="spellCheckBtn" title="Toggle Spell Check">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+            </svg>
+        </button>
+
+        <button class="tool-btn" onclick="toggleFullscreen()" title="Toggle Fullscreen">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+            </svg>
+        </button>
+
+        <button class="tool-btn" onclick="toggleTheme()" title="Toggle Theme">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+        </button>
+    </div>
+
+    <input type="file" id="fileInput" accept=".txt" onchange="importText(event)">
+
+    <script>
+        const editor = document.getElementById('editor');
+        const body = document.body;
+        let currentFontSize = 16;
+
+        // Load theme preference
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        if (savedTheme === 'dark') {
+            body.setAttribute('data-theme', 'dark');
+        }
+
+        // Load spell check preference
+        const savedSpellCheck = localStorage.getItem('spellCheck');
+        if (savedSpellCheck === 'false') {
+            editor.setAttribute('spellcheck', 'false');
+            document.getElementById('spellCheckBtn').style.opacity = '0.5';
+        }
+
+        // Load saved content
+        const savedContent = localStorage.getItem('editorContent');
+        if (savedContent) {
+            editor.innerHTML = savedContent;
+        }
+
+        // Auto-save content
+        editor.addEventListener('input', () => {
+            localStorage.setItem('editorContent', editor.innerHTML);
+        });
+
+        function toggleCmd(command) {
+            document.execCommand(command, false, null);
+            editor.focus();
+        }
+
+        function execCmd(command) {
+            document.execCommand(command, false, null);
+            editor.focus();
+        }
+
+        function applyHighlight(color) {
+            const selection = window.getSelection();
+            if (selection.rangeCount === 0 || selection.isCollapsed) {
+                editor.focus();
+                return;
+            }
+            
+            const range = selection.getRangeAt(0);
+            
+            // Create a span with background color
+            const span = document.createElement('span');
+            span.style.backgroundColor = color;
+            span.style.opacity = '1';
+            span.style.padding = '2px 0';
+            
+            // Use rgba for better transparency control
+            const hexToRgba = (hex) => {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, 0.35)`;
+            };
+            
+            span.style.backgroundColor = hexToRgba(color);
+            
+            // Wrap the selected content
+            try {
+                const contents = range.cloneContents();
+                span.appendChild(contents);
+                range.deleteContents();
+                range.insertNode(span);
+            } catch (e) {
+                console.error('Highlight error:', e);
+            }
+            
+            // Clear selection
+            selection.removeAllRanges();
+            
+            // Save content
+            localStorage.setItem('editorContent', editor.innerHTML);
+            editor.focus();
+        }
+
+        function removeHighlight() {
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                document.execCommand('removeFormat', false, null);
+            }
+            editor.focus();
+        }
+
+        function increaseFontSize() {
+            if (currentFontSize < 72) {
+                currentFontSize += 2;
+                updateFontSize();
+            }
+        }
+
+        function decreaseFontSize() {
+            if (currentFontSize > 8) {
+                currentFontSize -= 2;
+                updateFontSize();
+            }
+        }
+
+        function updateFontSize() {
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                document.execCommand('fontSize', false, '7');
+                const fontElements = editor.querySelectorAll('font[size="7"]');
+                fontElements.forEach(element => {
+                    element.removeAttribute('size');
+                    element.style.fontSize = currentFontSize + 'px';
+                });
+            } else {
+                editor.style.fontSize = currentFontSize + 'px';
+            }
+            editor.focus();
+        }
+
+        function toggleSpellCheck() {
+            const currentState = editor.getAttribute('spellcheck') === 'true';
+            const newState = !currentState;
+            editor.setAttribute('spellcheck', newState);
+            localStorage.setItem('spellCheck', newState);
+            
+            const btn = document.getElementById('spellCheckBtn');
+            btn.style.opacity = newState ? '1' : '0.5';
+            
+            // Force re-render to update spell check
+            const content = editor.innerHTML;
+            editor.innerHTML = '';
+            editor.innerHTML = content;
+            editor.focus();
+        }
+
+        function toggleTheme() {
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log('Error attempting to enable fullscreen:', err);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+
+        function downloadText() {
+            const text = editor.innerText;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'document.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importText(event) {
+            const file = event.target.files[0];
+            if (file && file.type === 'text/plain') {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    editor.innerText = e.target.result;
+                    localStorage.setItem('editorContent', editor.innerHTML);
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Focus editor on load
+        editor.focus();
+    </script>
+</body>
+</html>
