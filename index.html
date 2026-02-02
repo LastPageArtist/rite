@@ -16,7 +16,7 @@
             --text: #0a0a0a;
             --island-bg: #f5f5f5;
             --island-border: #e0e0e0;
-            --button-hover: #e8e8e8;
+            --button-hover: #d8d8d8;
             --shadow: rgba(0, 0, 0, 0.1);
             --island-scale: 0.9;
         }
@@ -26,7 +26,7 @@
             --text: #f0f0f0;
             --island-bg: #2a2a2a;
             --island-border: #3a3a3a;
-            --button-hover: #3a3a3a;
+            --button-hover: #404040;
             --shadow: rgba(0, 0, 0, 0.3);
             --island-scale: 0.9;
         }
@@ -116,6 +116,8 @@
 
         .tool-btn.active {
             background: var(--button-hover);
+            opacity: 0.8;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .divider {
@@ -328,13 +330,60 @@
 
         function toggleCmd(command) {
             document.execCommand(command, false, null);
+            updateToolbarStates();
             editor.focus();
         }
 
         function execCmd(command) {
             document.execCommand(command, false, null);
+            updateToolbarStates();
             editor.focus();
         }
+
+        // Update toolbar button states based on current selection
+        function updateToolbarStates() {
+            const commands = {
+                'bold': document.queryCommandState('bold'),
+                'italic': document.queryCommandState('italic'),
+                'underline': document.queryCommandState('underline'),
+                'justifyLeft': document.queryCommandState('justifyLeft'),
+                'justifyCenter': document.queryCommandState('justifyCenter'),
+                'justifyRight': document.queryCommandState('justifyRight')
+            };
+
+            // Update button states
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                const onclick = btn.getAttribute('onclick');
+                if (onclick) {
+                    if (onclick.includes("toggleCmd('bold')") && commands.bold) {
+                        btn.classList.add('active');
+                    } else if (onclick.includes("toggleCmd('italic')") && commands.italic) {
+                        btn.classList.add('active');
+                    } else if (onclick.includes("toggleCmd('underline')") && commands.underline) {
+                        btn.classList.add('active');
+                    } else if (onclick.includes("execCmd('justifyLeft')") && commands.justifyLeft) {
+                        btn.classList.add('active');
+                    } else if (onclick.includes("execCmd('justifyCenter')") && commands.justifyCenter) {
+                        btn.classList.add('active');
+                    } else if (onclick.includes("execCmd('justifyRight')") && commands.justifyRight) {
+                        btn.classList.add('active');
+                    } else if (onclick.includes("toggleCmd") || onclick.includes("execCmd('justify")) {
+                        btn.classList.remove('active');
+                    }
+                }
+            });
+        }
+
+        // Listen for selection changes to update button states
+        document.addEventListener('selectionchange', () => {
+            if (document.activeElement === editor) {
+                updateToolbarStates();
+            }
+        });
+
+        // Update states when clicking in editor
+        editor.addEventListener('mouseup', updateToolbarStates);
+        editor.addEventListener('keyup', updateToolbarStates);
 
         function applyHighlight(color) {
             const selection = window.getSelection();
@@ -388,31 +437,56 @@
         }
 
         function increaseFontSize() {
-            if (currentFontSize < 72) {
-                currentFontSize += 2;
-                updateFontSize();
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                if (currentFontSize < 72) {
+                    currentFontSize += 2;
+                    applyFontSize();
+                }
             }
         }
 
         function decreaseFontSize() {
-            if (currentFontSize > 8) {
-                currentFontSize -= 2;
-                updateFontSize();
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                if (currentFontSize > 8) {
+                    currentFontSize -= 2;
+                    applyFontSize();
+                }
             }
         }
 
-        function updateFontSize() {
+        function applyFontSize() {
             const selection = window.getSelection();
-            if (selection.rangeCount > 0 && !selection.isCollapsed) {
-                document.execCommand('fontSize', false, '7');
-                const fontElements = editor.querySelectorAll('font[size="7"]');
-                fontElements.forEach(element => {
-                    element.removeAttribute('size');
-                    element.style.fontSize = currentFontSize + 'px';
-                });
-            } else {
-                editor.style.fontSize = currentFontSize + 'px';
+            if (selection.rangeCount === 0 || selection.isCollapsed) {
+                return;
             }
+            
+            // Save the range before we lose it
+            const range = selection.getRangeAt(0).cloneRange();
+            
+            // Use execCommand for better compatibility
+            document.execCommand('fontSize', false, '7');
+            
+            // Find all font elements with size 7 and update them
+            const fontElements = editor.querySelectorAll('font[size="7"]');
+            fontElements.forEach(element => {
+                element.removeAttribute('size');
+                element.style.fontSize = currentFontSize + 'px';
+                // Remove any line-height that might be set
+                element.style.lineHeight = 'inherit';
+            });
+            
+            // Restore the selection
+            try {
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } catch (e) {
+                console.log('Could not restore selection');
+            }
+            
+            // Save
+            localStorage.setItem('editorContent', editor.innerHTML);
             editor.focus();
         }
 
